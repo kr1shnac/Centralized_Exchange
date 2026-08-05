@@ -23,16 +23,29 @@ app.post("/signup", async (req, res) => {
 
     const userExist = await prisma.user.findUnique({
         where: {
-            username: username
+            username
         }
     })
 
     if(userExist) {
         return res.json({
-            message: "username already taken, try diff username"
+            message: "username already taken"
         })
     }
 
+    await prisma.user.create({
+        data: {
+            username,
+            password
+        }
+    }) 
+
+    return res.json({
+        message: "user successfully created"
+    })
+
 })
+
+app.post("/login")
 
 app.listen(3000)
