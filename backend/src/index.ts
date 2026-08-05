@@ -46,6 +46,25 @@ app.post("/signup", async (req, res) => {
 
 })
 
-app.post("/login")
+app.post("/login", async (req, res) => {
+    const { username, password } = req.body;
+
+    const user = await prisma.user.findUnique({
+        where: {
+            username,
+            password
+        }
+    })
+ 
+    if(!user) {
+        return res.json({
+            message: "incorrect login creditionals"
+        })
+    }
+
+    return res.json({
+        message: username + " logged in successfully!!"
+    })
+})
 
 app.listen(3000)
