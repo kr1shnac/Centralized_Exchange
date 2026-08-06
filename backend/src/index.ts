@@ -1,12 +1,14 @@
 import "dotenv/config"
 import express from "express";
+import jwt from "jsonwebtoken"
+import authMiddleware from "./middleware.js"
 
 //------Prisma DB------------
 import { PrismaClient } from "../generated/prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
 
 const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL
+    connectionString: process.env.DATABASE_URL!
 });
 
 const prisma = new PrismaClient({
@@ -61,6 +63,10 @@ app.post("/login", async (req, res) => {
             message: "incorrect login creditionals"
         })
     }
+
+    const token = jwt.sign({
+        username
+    }, process.env.JWT_SECRET!)
 
     return res.json({
         message: username + " logged in successfully!!"
