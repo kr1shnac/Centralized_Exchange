@@ -112,8 +112,9 @@ app.post("/login", async (req, res) => {
 
 //order
 
+//my thoughts errors are not yet cleared
 app.post("/order", authMiddleware, async (req, res) => {
-    const userId = (req as any).userId;
+    const userId = (req as any).userId
     const {symbol, side, price, qty, type} = req.body;
 
     const user = await prisma.user.findUnique({
@@ -123,7 +124,7 @@ app.post("/order", authMiddleware, async (req, res) => {
     })
 
     if(!user) {
-        return res.status(401).json({
+        return res.status(404).json({
             message: "user doesn't exist"
         })
     }
@@ -136,18 +137,88 @@ app.post("/order", authMiddleware, async (req, res) => {
     })
 
     if(!userOrder) {
-        return res.status(401).json({
+        return res.status(404).json({
             message: `${symbol} is not present`
         })
     }
 
-    const userBalance = BALANCE[userId].INR.available;
+    if(type === "LIMIT") {
 
-    if(userBalance < price * qty) {
-        return res.status(401).json({
-            message: "Insufficient balance"
-        })
+        if(side === "BUY") {
+            const userBalance = BALANCE[userId].INR.available;
+    
+            if(userBalance < price * qty) {
+                return res.status(404).json({
+                    message: "Insufficient balance"
+                })
+            }
+
+            const userLocked = BALANCE[userId].INR.locked;
+    
+            const updateAvailable = userBalance - (price * qty)
+            const updateLocked = userLocked + (price * qty)
+            
+            updateAvailable = updateBalance
+    
+            res.json({
+                message: `Amount debited and your balance is ${userBalance} and ${userLocked} is locked`
+            })
+    
+        } else {
+            const userStock = BALANCE[userId].symbol.available
+    
+            if(userStock < price * qty) {
+                return res.status(404).json({
+                    message: "Insufficient stock present to sell"
+                })
+            }
+
+            userStock = userStock - (qty * price);
+
+            const userLocked = BALANCE[userId].symbol.locked;
+
+            userLocked = userLocked + (qty * price)
+
+            res.json({
+                message: `${userStock} is placed to sell and ${userLocked} is locked`
+            })
+        }
+
+    } else {
+        if (side === "BUY") {
+            const userBalance = BALANCE[userId].INR.available;
+
+            if(userBalance < price * qty) {
+                return res.json({
+                    message: "insufficient balance"
+                })
+            }
+
+            userBalance = userBalance - (price * qty)
+
+            return res.json({
+                message: "Amount deducted"
+            })
+        } else {
+            const userStock = BALANCE[userId].symbol.available;
+
+            if(userStock < price * qty) {
+                return res.status(404).json({
+                    message: "insuffient stocks present to sell"
+                })
+            }
+
+            userStock = userStock - (price * qty)
+
+            return res.json({
+                message: `user sold your stock at ${userStock}`
+            })
+        }
     }
+
+    
+
+    
 
     
 })
