@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken"
 import type {Request, Response, NextFunction} from "express"
 
 interface JwtPayload {
-    username: string
+    userId: Number
 }
 
 function authMiddleware (req: Request, res: Response, next: NextFunction) {
@@ -25,7 +25,7 @@ function authMiddleware (req: Request, res: Response, next: NextFunction) {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload //as {username : string}
-        (req as any).username = decoded.username 
+        (req as any).userId = decoded.userId 
 
         next()
     } catch (err) {
