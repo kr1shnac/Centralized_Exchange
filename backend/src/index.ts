@@ -18,8 +18,18 @@ const prisma = new PrismaClient({
 //------------------------------
 
 //-----in memory db --------
+type Asset = {
+    available: number,
+    locked: number
+}
 
-const BALANCE = {
+type Balance = {
+    [userId: number]: {
+        [asset: string]: Asset
+    }
+}
+
+const BALANCE: Balance = {
     1: {
         AXIS: {
             locked: 10,
@@ -31,13 +41,13 @@ const BALANCE = {
         },
         INR: {
             locked: 10,
-            available: 10
+            available: 1000
         }
     },
     2: {
         INR: {
             locked: 10,
-            available: 10
+            available: 12220
         }
     }
 }
@@ -45,6 +55,7 @@ const BALANCE = {
 const app = express()
 
 app.use(express.json())
+
 
 app.post("/signup", async (req, res) => {
     const {username, password} = req.body;
@@ -112,115 +123,147 @@ app.post("/login", async (req, res) => {
 
 //order
 
-//my thoughts errors are not yet cleared
 app.post("/order", authMiddleware, async (req, res) => {
-    const userId = (req as any).userId
-    const {symbol, side, price, qty, type} = req.body;
+    const userId = (req as any).userId;
+
+    const { type, side, symbol, qty, price } = req.body;
+
+    if(!type || !side || !symbol || !qty === undefined || !price === undefined) {
+        return res.status(404).json({
+            message: "type, side, symbol, qty, price not found"
+        })
+    }
+
+    if(side !== "BUY" || side !== "SELL") {
+        return res.status(403).json({
+            messsage: "your side can either be BUY or SELL"
+        })
+    }
+
+    if(type !== "LIMIT") {
+        return res.status(403).json({
+            message: "Your present logic is only LIMIt"
+        })
+    }
+
+    if(qty <= 0) {
+        return res.status(403).json({
+            message: "quantity cant be negative"
+        })
+    }
+
+    if(price <= 0) {
+        return res.status(403).json({
+            message: "price cant be negative"
+        })
+    }
 
     const user = await prisma.user.findUnique({
         where: {
             id: userId
-        }
+        },
     })
 
     if(!user) {
         return res.status(404).json({
-            message: "user doesn't exist"
+            message: "user not found"
         })
     }
 
-    //check stock present in db
-    const userOrder = await prisma.stock.findUnique({
+    const stock = await prisma.stock.findUnique({
         where: {
             symbol: symbol
         }
     })
 
-    if(!userOrder) {
+    if(!stock) {
         return res.status(404).json({
-            message: `${symbol} is not present`
+            message: "Stock not found"
+        })
+    }
+
+    const userBalance = BALANCE[userId] 
+
+    if(!userBalance) {
+        return res.status(404).json({
+            message: "Balance not found"
         })
     }
 
     if(type === "LIMIT") {
 
-        if(side === "BUY") {
-            const userBalance = BALANCE[userId].INR.available;
-    
-            if(userBalance < price * qty) {
-                return res.status(404).json({
-                    message: "Insufficient balance"
-                })
-            }
-
-            const userLocked = BALANCE[userId].INR.locked;
-    
-            const updateAvailable = userBalance - (price * qty)
-            const updateLocked = userLocked + (price * qty)
-            
-            updateAvailable = updateBalance
-    
-            res.json({
-                message: `Amount debited and your balance is ${userBalance} and ${userLocked} is locked`
-            })
-    
-        } else {
-            const userStock = BALANCE[userId].symbol.available
-    
-            if(userStock < price * qty) {
-                return res.status(404).json({
-                    message: "Insufficient stock present to sell"
-                })
-            }
-
-            userStock = userStock - (qty * price);
-
-            const userLocked = BALANCE[userId].symbol.locked;
-
-            userLocked = userLocked + (qty * price)
-
-            res.json({
-                message: `${userStock} is placed to sell and ${userLocked} is locked`
-            })
-        }
-
-    } else {
         if (side === "BUY") {
-            const userBalance = BALANCE[userId].INR.available;
+            const inrBalance = userBalance.INR
 
-            if(userBalance < price * qty) {
-                return res.json({
-                    message: "insufficient balance"
-                })
-            }
-
-            userBalance = userBalance - (price * qty)
-
-            return res.json({
-                message: "Amount deducted"
-            })
-        } else {
-            const userStock = BALANCE[userId].symbol.available;
-
-            if(userStock < price * qty) {
+            if(!inrBalance) {
                 return res.status(404).json({
-                    message: "insuffient stocks present to sell"
+                    message: "INR Balance not found"
                 })
             }
 
-            userStock = userStock - (price * qty)
+            const requiredAmount = qty * price
 
-            return res.json({
-                message: `user sold your stock at ${userStock}`
-            })
+            if(inrBalance.available < requiredAmount) {
+                return res.status(402).json({
+                    message: `You have insuffient balance short by ${requiredAmount - inrBalance.available}`
+                })
+            }
+
+            inrBalance.available -= requiredAmount
+            inrBalance.locked += requiredAmount
+
+            
+        } 
+
+        if(side === "SELL") {
+            const stockBalance = userBalance[symbol]
+
+            if(!stockBalance) {
+                return res.status(403).json({
+                    message: "Stock balance not found"
+                })
+            }
+
+            if(stockBalance.available < qty) {
+                return res.status(403).json({
+                    message: `Short by ${qty - stockBalance.available}, insuffient balance`
+                })
+            }
+
+            stockBalance.available -= qty
+            stockBalance.locked += qty
+            
         }
+
+        //we store order in db
+        const order = await prisma.order.create({
+            data: {
+                userId: userId,
+                stockId: stock.id,
+                side: side,
+                price: price,
+                qty: qty,
+                type: type,
+                status: "OPEN",
+                filledQty: 0
+            }
+        })
+
+        const responseBalance = side === "BUY" ? userBalance.INR : userBalance.symbol
+
+        return res.status(201).json({
+            message: `Limit ${side} order created successfully`,
+            order,
+            balance: responseBalance
+            // balance: {
+            //     available: userBalance[INR].available,
+            //     locked: userBalance[INR].locked
+            // } 
+            //what if someone try to buy using AXIS insted of INR which is invalid 
+            // so for BUY its INR for sell its symbol of stock 
+        })
     }
-
     
-
-    
-
-    
-})
+}) 
 
 app.listen(3000)
