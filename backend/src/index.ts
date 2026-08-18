@@ -52,6 +52,33 @@ const BALANCE: Balance = {
     }
 }
 
+const ORDERBOOK = {
+    AXIS: {
+        asks: [
+            {price: 100, qty: 30},
+            {price: 200, qty: 30},
+            {price: 200, qty: 30},
+        ],
+        bids: [
+            {price: 200, qty: 30},
+            {price: 200, qty: 30},
+            {price: 200, qty: 30},
+        ]
+    }, 
+    HDFC: {
+        asks: [
+            {price: 100, qty: 30},
+            {price: 200, qty: 30},
+            {price: 200, qty: 30},
+        ],
+        bids: [
+            {price: 200, qty: 30},
+            {price: 200, qty: 30},
+            {price: 200, qty: 30},
+        ]
+    }
+}
+
 const app = express()
 
 app.use(express.json())
@@ -212,6 +239,11 @@ app.post("/order", authMiddleware, async (req, res) => {
             inrBalance.available -= requiredAmount
             inrBalance.locked += requiredAmount
 
+            const orderBook = ORDERBOOK[symbol]
+
+            orderBook.asks.push({
+                qty, price
+            })
             
         } 
 
@@ -232,6 +264,10 @@ app.post("/order", authMiddleware, async (req, res) => {
 
             stockBalance.available -= qty
             stockBalance.locked += qty
+
+            const orderBook = ORDERBOOK[symbol]
+
+            orderBook.bids.
             
         }
 
