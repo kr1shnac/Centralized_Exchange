@@ -52,30 +52,33 @@ const BALANCE: Balance = {
     }
 }
 
-const ORDERBOOK = {
+//order book
+
+type BookOrder = {
+    userId: number,
+    orderId: number,
+    price: number,
+    remainingQty: number,
+    side: "BUY" | "SELL"
+}
+
+type MarketOrderBook = {
+    bids: BookOrder[],
+    asks: BookOrder[]
+}
+
+type Orderbook = {
+    [symbol: string]: MarketOrderBook
+}
+
+const ORDERBOOK : Orderbook= {
     AXIS: {
-        asks: [
-            {price: 100, qty: 30},
-            {price: 200, qty: 30},
-            {price: 200, qty: 30},
-        ],
-        bids: [
-            {price: 200, qty: 30},
-            {price: 200, qty: 30},
-            {price: 200, qty: 30},
-        ]
+        asks: [],
+        bids: []
     }, 
     HDFC: {
-        asks: [
-            {price: 100, qty: 30},
-            {price: 200, qty: 30},
-            {price: 200, qty: 30},
-        ],
-        bids: [
-            {price: 200, qty: 30},
-            {price: 200, qty: 30},
-            {price: 200, qty: 30},
-        ]
+        asks: [],
+        bids: []
     }
 }
 
@@ -161,7 +164,7 @@ app.post("/order", authMiddleware, async (req, res) => {
         })
     }
 
-    if(side !== "BUY" || side !== "SELL") {
+    if(side !== "BUY" && side !== "SELL") {
         return res.status(403).json({
             messsage: "your side can either be BUY or SELL"
         })
@@ -238,12 +241,6 @@ app.post("/order", authMiddleware, async (req, res) => {
 
             inrBalance.available -= requiredAmount
             inrBalance.locked += requiredAmount
-
-            const orderBook = ORDERBOOK[symbol]
-
-            orderBook.asks.push({
-                qty, price
-            })
             
         } 
 
@@ -264,30 +261,43 @@ app.post("/order", authMiddleware, async (req, res) => {
 
             stockBalance.available -= qty
             stockBalance.locked += qty
-
-            const orderBook = ORDERBOOK[symbol]
-
-            orderBook.bids.
             
         }
+
+         // ==========================================================
+        // YOUR NEXT PART
+        // ==========================================================
+        //
+        // 1. Check the opposite side of ORDERBOOK.
+        // 2. Match if price conditions are satisfied.
+        // 3. Calculate filledQty.
+        // 4. Create fills.
+        // 5. Update remainingQty.
+        // 6. If LIMIT order has remaining quantity,
+        //    put the remaining order onto the book.
+        //
+        // DO NOT implement this part by copying AI.
+        //
+        // ==========================================================
+
 
         //we store order in db
         const order = await prisma.order.create({
             data: {
-                userId: userId,
+                userId,
                 stockId: stock.id,
-                side: side,
-                price: price,
-                qty: qty,
-                type: type,
+                side,
+                price,
+                qty,
+                filledQty: 0,
+                type: "LIMIT",
                 status: "OPEN",
-                filledQty: 0
             }
         })
 
         const responseBalance = side === "BUY" ? userBalance.INR : userBalance.symbol
 
-        return res.status(201).json({
+        res.status(201).json({
             message: `Limit ${side} order created successfully`,
             order,
             balance: responseBalance
@@ -299,7 +309,16 @@ app.post("/order", authMiddleware, async (req, res) => {
             // so for BUY its INR for sell its symbol of stock 
         })
     }
-    
 }) 
+
+//get user orders
+app.get("/order", authMiddleware, async (req, res) => {
+
+})
+
+//get user balance
+app.get("/balance", authMiddleware, async (req, res) => {
+    
+})
 
 app.listen(3000)
