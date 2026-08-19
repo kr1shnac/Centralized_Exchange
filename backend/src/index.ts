@@ -264,7 +264,11 @@ app.post("/order", authMiddleware, async (req, res) => {
             
         }
 
-         // ==========================================================
+        if(side === "BUY") {
+            ORDERBOOK[userId][symbol].asks.filledQty
+        }
+
+        // ==========================================================
         // YOUR NEXT PART
         // ==========================================================
         //
@@ -313,12 +317,81 @@ app.post("/order", authMiddleware, async (req, res) => {
 
 //get user orders
 app.get("/order", authMiddleware, async (req, res) => {
+    try {
+        const userId = (req as any).userId
 
+        const user = await prisma.user.findUnique({
+            where: {
+                id: userId //comparing db id with userId
+            }
+        })
+    
+        if(!user) {
+            return res.status(403).json({
+                message: "User is invalid try logging in again"
+            })
+        }
+    
+        const order = await prisma.order.findMany({
+            where: {
+                userId
+            }, 
+            orderBy: {
+                createdAt: "desc",
+            }
+        })
+    
+        return res.json({
+            message: `${user.username} orders are: `,
+            order
+        })
+
+    } catch (err) {
+        console.log(err)
+
+        return res.status(500).json({
+            message: "Internal server error"
+        })
+    }
+    
 })
 
 //get user balance
 app.get("/balance", authMiddleware, async (req, res) => {
+    try {
+        const userId = (req as any).userId
+
+        const user = await prisma.user.findUnique({
+            where: {
+                id: userId
+            }
+        })
+
+        if(!user) {
+            return res.status(403).json({
+                message: "invalid user id, login again"
+            })
+        }
+
+        const getBalance = BALANCE[userId]
+
+        if(!getBalance) {
+            return res.json({
+                message: "Balance not found"
+            })
+        }
     
+        return res.json({
+            Balance: getBalance
+        })
+
+    } catch (err) {
+        console.log(err)
+
+        return res.status(500).json({
+            message: "Internal server error"
+        })
+    }
 })
 
-app.listen(3000)
+app.listen(3000);
